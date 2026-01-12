@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReAct Agent Chat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body {
+            padding: 1rem;
+        }
+        
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            height: 70vh;
+            overflow-y: auto;
+            padding: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+            display: block;
+        }
+        
+        .user-message {
+            background-color: #0172ad;
+            color: white;
+            align-self: flex-end;
+            text-align: right;
+        }
+        
+        .agent-message {
+            background-color: #525f7a;
+            color: white;
+            align-self: flex-start;
+        }
+        
+        .input-container {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .input-container input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        
+        .input-container button {
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--muted-color);
+            font-style: italic;
+            padding: 1rem;
+        }
+        
+        .header {
+            max-width: 800px;
+            margin: 0 auto 1rem auto;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            color: var(--muted-color);
+            margin-bottom: 0;
+        }
+        
+        .intro-message {
+            background-color: #e0e0e0;
+            color: black;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <div class="header">
+            <h1>🤖 ReAct Agent</h1>
+            <p>Ask me to calculate, get the time, check weather, or search Wikipedia!</p>
+        </div>
+        
+        <div class="chat-container" id="chatContainer">
+            <div class="intro-message">
+                What can I help you with: Calculate, Time, Get weather, or Wikipedia.
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="userInput" 
+                placeholder="Type your message here..." 
+                autocomplete="off"
+                onkeypress="if(event.key==='Enter')sendMessage()"
+            >
+            <button id="sendButton" onclick="sendMessage()">Send</button>
+        </div>
+    </main>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        
+        function addMessage(content, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+            messageDiv.textContent = content;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function showLoading() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.id = 'loadingIndicator';
+            loadingDiv.textContent = 'Thinking...';
+            chatContainer.appendChild(loadingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function hideLoading() {
+            const loadingDiv = document.getElementById('loadingIndicator');
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        }
+        
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            
+            if (!message) {
+                return;
+            }
+            
+            // Display user message
+            addMessage(message, true);
+            userInput.value = '';
+            
+            // Disable input while processing
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            
+            // Show loading indicator
+            showLoading();
+            
+            // Use XMLHttpRequest for better compatibility
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/chat', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    hideLoading();
+                    userInput.disabled = false;
+                    sendButton.disabled = false;
+                    userInput.focus();
+                    
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            console.log('Response:', data);
+                            
+                            if (data.error) {
+                                addMessage('Error: ' + data.error, false);
+                            } else if (data.response) {
+                                addMessage(data.response, false);
+                            } else {
+                                addMessage('No response received.', false);
+                            }
+                        } catch (e) {
+                            addMessage('Error parsing response: ' + e.message, false);
+                        }
+                    } else {
+                        addMessage('Error: HTTP ' + xhr.status, false);
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                hideLoading();
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                addMessage('Error: Network error', false);
+            };
+            
+            xhr.send(JSON.stringify({ message: message }));
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Focus input on load
+        userInput.focus();
+    </script>
+</body>
+</html>
